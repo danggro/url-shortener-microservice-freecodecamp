@@ -3,11 +3,12 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const dns = require('node:dns');
+const shortID = require('shortid');
 const app = express();
 
 // Basic Configuration
-const port = process.env.PORT || 3000;
-const ips = [];
+const port = process.env.PORT || 5000;
+const ips = [{ original_url: 'https://freeCodeCamp.org', short_url: 1 }];
 app.use(cors());
 
 app.use('/public', express.static(`${process.cwd()}/public`));
@@ -24,30 +25,37 @@ app.get('/api/hello', function (req, res) {
 });
 
 app.post('/api/shorturl', function (req, res) {
-  const url = req.body.url.replace(/^https?:\/\//i, '');
-  if (!req.body.url.includes('http')) {
-    return res.json({ error: 'Invalid URL' });
-  }
-  const index = ips.findIndex((item) => item.original_url == req.body.url);
-  dns.lookup(url, (err, address) => {
-    console.log(index);
+  try {
+    const { url: longUrl } = req.body;
+    const { hostname } = new URL(longUrl);
+    const index = ips.findIndex((item) => item.original_url == req.body.url);
     if (index !== -1) {
       return res.json(ips[index]);
     }
-    if (address !== undefined) {
-      const temp = { original_url: req.body.url, short_url: ips.length + 1 };
-      ips.push(temp);
-      return res.json(temp);
-    }
+    dns.lookup(hostname, (err) => {
+      if (!err) {
+        const temp = {
+          original_url: req.body.url,
+          short_url: shortID.generate(),
+        };
+        ips.push(temp);
+        return res.json(temp);
+      } else {
+        return res.json({ error: 'Invalid URL' });
+      }
+    });
+  } catch (error) {
     return res.json({ error: 'Invalid URL' });
-  });
+  }
 });
 
-app.get('/api/shorturl/:number', function (req, res) {
+app.get('/api/shorturl/:number?', function (req, res) {
   const number = req.params.number;
   const ipShort = ips.filter((item) => item.short_url == number)[0];
-
-  res.redirect(ipShort.original_url);
+  if (isNaN(parseInt(number))) return res.json({ error: 'wrong format' });
+  if (ipShort == undefined)
+    return res.json({ error: 'No short URL found for the given input' });
+  return res.redirect(ipShort['original_url']);
 });
 
 app.listen(port, function () {
