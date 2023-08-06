@@ -28,7 +28,12 @@ app.post('/api/shorturl', function (req, res) {
   if (!req.body.url.includes('http')) {
     return res.json({ error: 'Invalid URL' });
   }
+  const index = ips.findIndex((item) => item.original_url == req.body.url);
   dns.lookup(url, (err, address) => {
+    console.log(index);
+    if (index !== -1) {
+      return res.json(ips[index]);
+    }
     if (address !== undefined) {
       const temp = { original_url: req.body.url, short_url: ips.length + 1 };
       ips.push(temp);
